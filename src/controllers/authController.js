@@ -2,12 +2,15 @@ import User from "../models/User.js";
 import jwt from "jsonwebtoken";
 import { generateAccessToken, generateRefreshToken } from "../utils/token.js";
 
+/** Register: name, email, password, role (optional), subscriptionPlan (optional) */
 export const register = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { name, email, password, role, subscriptionPlan } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ message: "Email and password are required" });
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        message: "Name, email and password are required",
+      });
     }
 
     const existingUser = await User.findOne({ email });
@@ -15,21 +18,34 @@ export const register = async (req, res) => {
       return res.status(409).json({ message: "Email already in use" });
     }
 
-    const user = await User.create({ email, password });
+    const user = await User.create({
+      name,
+      email,
+      password,
+      role: role || "patient",
+      subscriptionPlan: subscriptionPlan || "free",
+    });
 
     const accessToken = generateAccessToken(user._id);
     const refreshToken = generateRefreshToken(user._id);
-
     user.refreshToken = refreshToken;
     await user.save();
+
+    const userResponse = {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      subscriptionPlan: user.subscriptionPlan,
+    };
 
     res.status(201).json({
       accessToken,
       refreshToken,
-      user: { id: user._id, email: user.email },
+      user: userResponse,
     });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: err.message || "Registration failed" });
   }
 };
 
@@ -53,14 +69,21 @@ export const login = async (req, res) => {
 
     const accessToken = generateAccessToken(user._id);
     const refreshToken = generateRefreshToken(user._id);
-
     user.refreshToken = refreshToken;
     await user.save();
+
+    const userResponse = {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      subscriptionPlan: user.subscriptionPlan,
+    };
 
     res.json({
       accessToken,
       refreshToken,
-      user: { id: user._id, email: user.email },
+      user: userResponse,
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -107,13 +130,24 @@ export const logout = async (req, res) => {
   }
 };
 
+/** Get current user profile (role, subscription included) */
 export const me = async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId).select("-password -refreshToken");
+    const user = await User.findById(req.user.userId).select(
+      "-password -refreshToken"
+    );
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-    res.json({ user: { id: user._id, email: user.email } });
+    res.json({
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        subscriptionPlan: user.subscriptionPlan,
+      },
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

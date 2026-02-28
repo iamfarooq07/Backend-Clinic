@@ -1,8 +1,16 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 
+const ROLES = ["admin", "doctor", "receptionist", "patient"];
+const PLANS = ["free", "pro"];
+
 const userSchema = new mongoose.Schema(
   {
+    name: {
+      type: String,
+      required: [true, "Name is required"],
+      trim: true,
+    },
     email: {
       type: String,
       required: [true, "Email is required"],
@@ -14,6 +22,21 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: [true, "Password is required"],
       minlength: 6,
+    },
+    role: {
+      type: String,
+      enum: ROLES,
+      default: "patient",
+    },
+    subscriptionPlan: {
+      type: String,
+      enum: PLANS,
+      default: "free",
+    },
+    linkedPatientId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Patient",
+      default: null,
     },
     refreshToken: {
       type: String,
@@ -34,3 +57,4 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
 };
 
 export default mongoose.model("User", userSchema);
+export { ROLES, PLANS };
