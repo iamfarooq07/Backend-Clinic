@@ -1,4 +1,5 @@
 {
+<<<<<<< HEAD
   "name": "clinic-management-backend",
   "version": "1.0.0",
   "description": "AI Clinic Management Backend",
@@ -29,3 +30,28 @@
     "nodemon": "^3.0.1"
   }
 }
+=======
+  "name": "backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.7.0",
+    "pdfkit": "^0.15.0",
+    "cloudinary": "^2.5.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.7"
+  }
+}
+>>>>>>> 175464f80bd7cbbab1ba8aa2b041be3e3d8689ba
