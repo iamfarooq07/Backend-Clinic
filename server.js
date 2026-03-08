@@ -32,12 +32,12 @@ const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    
+
     // Allow all localhost origins
     if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
       return callback(null, true);
     }
-    
+
     // Allow specific origins
     const allowedOrigins = [
       process.env.FRONTEND_URL,
@@ -45,7 +45,7 @@ const corsOptions = {
       'http://localhost:5174',
       'http://localhost:5175',
     ];
-    
+
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
