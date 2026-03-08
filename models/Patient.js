@@ -25,7 +25,6 @@ const patientSchema = new mongoose.Schema({
     type: String,
     trim: true,
     lowercase: true,
-    sparse: true, // Allows multiple null values but unique non-null values
   },
   address: {
     type: String,
@@ -53,9 +52,6 @@ const patientSchema = new mongoose.Schema({
     default: Date.now,
   },
 });
-
-// Create index for email to ensure uniqueness when present
-patientSchema.index({ email: 1 }, { unique: true, sparse: true });
 
 const Patient = mongoose.model('Patient', patientSchema);
 
