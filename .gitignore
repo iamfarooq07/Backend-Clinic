@@ -1,13 +1,9 @@
 node_modules/
 .env
-<<<<<<< HEAD
+.env.local
 *.log
 .DS_Store
 uploads/
 dist/
 build/
-=======
-.env.local
 .next/
-dist/
->>>>>>> 175464f80bd7cbbab1ba8aa2b041be3e3d8689ba
