@@ -4,7 +4,11 @@ import { body, validationResult } from 'express-validator';
 export const validate = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
+    const errorMessages = errors.array().map(err => err.msg).join(', ');
+    return res.status(400).json({ 
+      message: errorMessages,
+      errors: errors.array() 
+    });
   }
   next();
 };
@@ -33,8 +37,11 @@ export const patientValidation = [
 
 // Appointment validation rules
 export const appointmentValidation = [
-  body('patientId').notEmpty().withMessage('Patient ID is required'),
   body('doctorId').notEmpty().withMessage('Doctor ID is required'),
   body('date').isISO8601().withMessage('Valid date is required'),
   body('time').notEmpty().withMessage('Time is required'),
+  body('reason').optional().trim(),
+  body('notes').optional().trim(),
+  // patientId is optional - auto-created for patient role users
+  body('patientId').optional(),
 ];
