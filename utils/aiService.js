@@ -1,4 +1,10 @@
-import axios from 'axios';
+import Groq from 'groq-sdk';
+
+let groq = null;
+const getGroqClient = () => {
+  if (!groq) groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+  return groq;
+};
 
 // Fallback medical advice when AI fails
 const fallbackAdvice = {
@@ -8,30 +14,15 @@ const fallbackAdvice = {
   recommendations: 'Please consult with a healthcare professional for proper diagnosis and treatment.',
 };
 
-// AI-powered symptom analysis using Gemini or OpenAI
+// AI-powered symptom analysis using Groq
 export const analyzeSymptoms = async (symptoms, age, gender, medicalHistory) => {
   try {
-    // Check if Gemini API key is configured
-    if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here') {
-      return await analyzeWithGemini(symptoms, age, gender, medicalHistory);
-    }
-    
-    // Check if OpenAI API key is configured
-    if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here') {
-      return await analyzeWithOpenAI(symptoms, age, gender, medicalHistory);
+    if (!process.env.GROQ_API_KEY) {
+      console.warn('No GROQ_API_KEY configured, using fallback advice');
+      return fallbackAdvice;
     }
 
-    console.warn('No AI API key configured, using fallback advice');
-    return fallbackAdvice;
-  } catch (error) {
-    console.error('AI Service Error:', error.message);
-    return fallbackAdvice;
-  }
-};
-
-// Gemini AI Analysis
-const analyzeWithGemini = async (symptoms, age, gender, medicalHistory) => {
-  const prompt = `You are a medical AI assistant. Analyze the following patient information and provide a structured response in JSON format only:
+    const prompt = `You are a medical AI assistant. Analyze the following patient information and provide a structured response in JSON format only:
 
 Patient Information:
 - Age: ${age}
@@ -49,134 +40,50 @@ Respond ONLY with a valid JSON object (no markdown, no code blocks) with these e
 
 Important: This is for informational purposes only. Always recommend consulting a healthcare professional.`;
 
-  const response = await axios.post(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${process.env.GEMINI_API_KEY}`,
-    {
-      contents: [{
-        parts: [{
-          text: prompt
-        }]
-      }]
-    },
-    {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      timeout: 15000,
-    }
-  );
-
-  const aiContent = response.data.candidates[0].content.parts[0].text;
-  
-  // Try to parse JSON response
-  try {
-    // Remove markdown code blocks if present
-    let cleanContent = aiContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    const parsedResponse = JSON.parse(cleanContent);
-    return parsedResponse;
-  } catch (parseError) {
-    console.warn('Failed to parse Gemini JSON response, extracting manually');
-    return {
-      possibleConditions: extractConditions(aiContent),
-      riskLevel: extractRiskLevel(aiContent),
-      suggestedTests: extractTests(aiContent),
-      recommendations: aiContent.substring(0, 300),
-    };
-  }
-};
-
-// OpenAI Analysis (fallback)
-const analyzeWithOpenAI = async (symptoms, age, gender, medicalHistory) => {
-  const prompt = `You are a medical AI assistant. Analyze the following patient information and provide a structured response:
-
-Patient Information:
-- Age: ${age}
-- Gender: ${gender}
-- Symptoms: ${symptoms}
-- Medical History: ${medicalHistory || 'None provided'}
-
-Provide a JSON response with:
-1. possibleConditions: Array of 2-4 possible medical conditions
-2. riskLevel: One of "low", "medium", "high", "critical"
-3. suggestedTests: Array of 2-4 recommended medical tests
-4. recommendations: Brief medical recommendations and precautions
-
-Important: This is for informational purposes only. Always recommend consulting a healthcare professional.`;
-
-  const response = await axios.post(
-    'https://api.openai.com/v1/chat/completions',
-    {
-      model: 'gpt-3.5-turbo',
+    const completion = await getGroqClient().chat.completions.create({
+      model: 'llama3-8b-8192',
       messages: [
-        {
-          role: 'system',
-          content: 'You are a medical AI assistant. Provide structured medical analysis in JSON format.',
-        },
-        {
-          role: 'user',
-          content: prompt,
-        },
+        { role: 'system', content: 'You are a medical AI assistant. Respond only with valid JSON.' },
+        { role: 'user', content: prompt },
       ],
       temperature: 0.7,
       max_tokens: 500,
-    },
-    {
-      headers: {
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      timeout: 10000,
-    }
-  );
+    });
 
-  const aiContent = response.data.choices[0].message.content;
-  
-  try {
-    const parsedResponse = JSON.parse(aiContent);
-    return parsedResponse;
-  } catch (parseError) {
-    return {
-      possibleConditions: extractConditions(aiContent),
-      riskLevel: extractRiskLevel(aiContent),
-      suggestedTests: extractTests(aiContent),
-      recommendations: aiContent.substring(0, 300),
-    };
+    const aiContent = completion.choices[0].message.content;
+
+    try {
+      let cleanContent = aiContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      return JSON.parse(cleanContent);
+    } catch {
+      console.warn('Failed to parse Groq JSON response, extracting manually');
+      return {
+        possibleConditions: extractConditions(aiContent),
+        riskLevel: extractRiskLevel(aiContent),
+        suggestedTests: extractTests(aiContent),
+        recommendations: aiContent.substring(0, 300),
+      };
+    }
+  } catch (error) {
+    console.error('AI Service Error:', error.message);
+    return fallbackAdvice;
   }
 };
 
-// Generate prescription explanation using AI
+// Generate prescription explanation using Groq
 export const generatePrescriptionExplanation = async (medicines, diagnosis) => {
   try {
-    // Check if Gemini API key is configured
-    if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here') {
-      return await explainWithGemini(medicines, diagnosis);
-    }
-    
-    // Check if OpenAI API key is configured
-    if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here') {
-      return await explainWithOpenAI(medicines, diagnosis);
+    if (!process.env.GROQ_API_KEY) {
+      return {
+        explanation: 'Please follow the prescribed medication as directed by your doctor.',
+        lifestyleAdvice: 'Maintain a healthy diet, exercise regularly, and get adequate rest.',
+        preventiveTips: 'Follow up with your doctor as scheduled.',
+      };
     }
 
-    return {
-      explanation: 'Please follow the prescribed medication as directed by your doctor.',
-      lifestyleAdvice: 'Maintain a healthy diet, exercise regularly, and get adequate rest.',
-      preventiveTips: 'Follow up with your doctor as scheduled.',
-    };
-  } catch (error) {
-    console.error('AI Prescription Explanation Error:', error.message);
-    return {
-      explanation: 'Please follow the prescribed medication as directed by your doctor.',
-      lifestyleAdvice: 'Maintain a healthy diet and exercise regularly.',
-      preventiveTips: 'Schedule regular check-ups with your doctor.',
-    };
-  }
-};
+    const medicineList = medicines.map(m => `${m.name} - ${m.dosage} - ${m.frequency}`).join(', ');
 
-// Gemini prescription explanation
-const explainWithGemini = async (medicines, diagnosis) => {
-  const medicineList = medicines.map(m => `${m.name} - ${m.dosage} - ${m.frequency}`).join(', ');
-  
-  const prompt = `Provide a simple explanation for a patient about their prescription in JSON format only:
+    const prompt = `Provide a simple explanation for a patient about their prescription in JSON format only:
 
 Diagnosis: ${diagnosis}
 Medicines: ${medicineList}
@@ -190,84 +97,39 @@ Respond ONLY with a valid JSON object (no markdown, no code blocks):
 
 Keep language simple and patient-friendly.`;
 
-  const response = await axios.post(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${process.env.GEMINI_API_KEY}`,
-    {
-      contents: [{
-        parts: [{
-          text: prompt
-        }]
-      }]
-    },
-    {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      timeout: 15000,
-    }
-  );
-
-  const aiContent = response.data.candidates[0].content.parts[0].text;
-  
-  try {
-    let cleanContent = aiContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    return JSON.parse(cleanContent);
-  } catch {
-    return {
-      explanation: aiContent.substring(0, 200),
-      lifestyleAdvice: 'Maintain a healthy lifestyle.',
-      preventiveTips: 'Follow your doctor\'s advice.',
-    };
-  }
-};
-
-// OpenAI prescription explanation
-const explainWithOpenAI = async (medicines, diagnosis) => {
-  const medicineList = medicines.map(m => `${m.name} - ${m.dosage} - ${m.frequency}`).join(', ');
-  
-  const prompt = `Provide a simple explanation for a patient about their prescription:
-
-Diagnosis: ${diagnosis}
-Medicines: ${medicineList}
-
-Provide a JSON response with:
-1. explanation: Simple explanation of what the medicines do (2-3 sentences)
-2. lifestyleAdvice: 2-3 lifestyle recommendations
-3. preventiveTips: 2-3 preventive care tips
-
-Keep language simple and patient-friendly.`;
-
-  const response = await axios.post(
-    'https://api.openai.com/v1/chat/completions',
-    {
-      model: 'gpt-3.5-turbo',
-      messages: [{ role: 'user', content: prompt }],
+    const completion = await getGroqClient().chat.completions.create({
+      model: 'llama3-8b-8192',
+      messages: [
+        { role: 'system', content: 'You are a medical AI assistant. Respond only with valid JSON.' },
+        { role: 'user', content: prompt },
+      ],
       temperature: 0.7,
       max_tokens: 300,
-    },
-    {
-      headers: {
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      timeout: 10000,
-    }
-  );
+    });
 
-  const aiContent = response.data.choices[0].message.content;
-  
-  try {
-    return JSON.parse(aiContent);
-  } catch {
+    const aiContent = completion.choices[0].message.content;
+
+    try {
+      let cleanContent = aiContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      return JSON.parse(cleanContent);
+    } catch {
+      return {
+        explanation: aiContent.substring(0, 200),
+        lifestyleAdvice: 'Maintain a healthy lifestyle.',
+        preventiveTips: "Follow your doctor's advice.",
+      };
+    }
+  } catch (error) {
+    console.error('AI Prescription Explanation Error:', error.message);
     return {
-      explanation: aiContent.substring(0, 200),
-      lifestyleAdvice: 'Maintain a healthy lifestyle.',
-      preventiveTips: 'Follow your doctor\'s advice.',
+      explanation: 'Please follow the prescribed medication as directed by your doctor.',
+      lifestyleAdvice: 'Maintain a healthy diet and exercise regularly.',
+      preventiveTips: 'Schedule regular check-ups with your doctor.',
     };
   }
 };
 
-// Helper functions for parsing AI responses
+// Helper functions
 function extractConditions(text) {
   const conditions = [];
   const lines = text.split('\n');

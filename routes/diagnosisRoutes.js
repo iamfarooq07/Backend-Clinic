@@ -5,16 +5,16 @@ import {
   getDiagnosisLog,
   getRiskFlags,
 } from '../controllers/diagnosisController.js';
-import { protect, authorize, requireProPlan } from '../middleware/auth.js';
+import { protect, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
 
 router
   .route('/')
   .get(protect, getDiagnosisLogs)
-  .post(protect, authorize('doctor'), requireProPlan, createDiagnosis);
+  .post(protect, authorize('doctor'), createDiagnosis);
 
-router.get('/risk-flags', protect, authorize('doctor', 'admin'), requireProPlan, getRiskFlags);
+router.get('/risk-flags', protect, authorize('doctor', 'admin'), getRiskFlags);
 
 router.route('/:id').get(protect, getDiagnosisLog);
 
